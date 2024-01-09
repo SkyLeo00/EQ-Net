@@ -37,23 +37,14 @@ def main():
         model = model.cuda()
         cudnn.benchmark = True
 
+    train_loader, _ = imagenet_dali.get_imagenet_iter_torch('train', cfg.DATASET.data_path,
+                                                            cfg.DATASET.train_batch_size,
+                                                            num_threads=2, crop=224, device_id=cfg.GPUS[0])
 
-    # _, train_set = imagenet_dali.get_imagenet_iter_torch('train', cfg.DATASET.data_path,
-    #                                                      cfg.DATASET.train_batch_size,
-    #                                                      num_threads=2, crop=224, device_id=cfg.GPUS[0])
- 
-    # _, test_set = imagenet_dali.get_imagenet_iter_torch('val', cfg.DATASET.data_path,
-    #                                                     cfg.DATASET.eval_batch_size,
-    #                                                     num_threads=2, crop=224, device_id=cfg.GPUS[0])
-    
-    dataset = torchvision.datasets.CIFAR10
-    train_set = dataset(root=cfg.DATASET.data_path, train=True, download=True,
-                          transform=imagenet_dali.cifar_transform(is_training=True))
- 
-    test_set = dataset(root=cfg.DATASET.data_path, train=False, download=True,
-                         transform=imagenet_dali.cifar_transform(is_training=False))
+    test_loader, _ = imagenet_dali.get_imagenet_iter_torch('val', cfg.DATASET.data_path, cfg.DATASET.eval_batch_size,
+                                                           num_threads=2, crop=224, device_id=cfg.GPUS[0])
 
-    wq_params = {'n_bits': cfg.w_bit, 'scale_method': 'mse', 'leaf_param': True} # what is leaf parameter? 
+    wq_params = {'n_bits': cfg.w_bit, 'scale_method': 'mse', 'leaf_param': True}
     aq_params = {'n_bits': cfg.a_bit, 'scale_method': 'mse', 'leaf_param': True}
     search_space = {
         'w_bit_list': cfg.SEARCH_SPACE.w_bit_list,
@@ -62,7 +53,6 @@ def main():
         'a_sym_list': cfg.SEARCH_SPACE.a_sym_list,
         'channel_wise_list': cfg.SEARCH_SPACE.channel_wise_list,
     }
-
     qnn = convert_to_QuantSuperModel(model, wq_params=wq_params, aq_params=aq_params, quantizer=cfg.quantizer,
                                      search_space=search_space)
 
@@ -76,7 +66,7 @@ def main():
         _ = qnn(cali_data.cuda())
 
     print('load model...')
-    ckpt = torch.load(cfg.super_model, map_location='cuda') # ckpt 
+    ckpt = torch.load(cfg.super_model, map_location='cuda')
     qnn.load_state_dict(ckpt['state_dict'])
 
     search_space = {
@@ -86,7 +76,6 @@ def main():
         'a_sym_list': [True, False],
         'channel_wise_list': [True, False],
     }
-    
     evaluation_quant_model_2to8(model=qnn, train_loader=train_loader, test_loader=test_loader,
                                 search_space=search_space)
 
