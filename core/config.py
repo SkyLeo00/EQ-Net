@@ -9,7 +9,7 @@ from yacs.config import CfgNode
 
 # Global config object
 _C = CfgNode(new_allowed=True)
-cfg = _C
+cfg = _C 
 
 _C.CUDNN_BENCH = True
 

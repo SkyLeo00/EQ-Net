@@ -1,6 +1,7 @@
 ModelType: super
 ARCH: resnet18
 Resume: None
+#this is not EQ model. This is for MultiQuant
 super_model: /home/E21201018/code/MultiQuant+/ExpNew/imagenet/supermodel/mobilenet_v2_super.pt
 
 OUT_DIR: ../exp

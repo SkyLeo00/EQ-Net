@@ -150,7 +150,7 @@ class QuantSuperNetTrainer(Trainer):
                  test_loader, mlp=None):
         super(QuantSuperNetTrainer, self).__init__(model, criterion, optimizer, lr_scheduler, train_loader, test_loader)
         self.soft_criterion = soft_criterion
-        self.teacher_model = teacher_model
+        self.teacher_model = teacher_model  
         self.alpha = 0.5
         self.evaluator = Evaluator()
         self.mlp = mlp
@@ -162,27 +162,28 @@ class QuantSuperNetTrainer(Trainer):
             self.teacher_model.eval()
         cur_step = cur_epoch * len(self.train_loader)
         self.train_meter.iter_tic()
-        for cur_iter, (inputs, labels) in enumerate(self.train_loader):
+        for cur_iter, (inputs, labels) in enumerate(self.train_loader): #cur_iter is Idx, (inputs, labels) is value
             self.optimizer.zero_grad()
             lr = self.adjust_learning_rate(cur_epoch, cur_iter)
             inputs, labels = inputs.cuda(), labels.cuda()
 
-            loss = cfg.CRITERION.kurt_rate * KurtosisLoss(self.model)
+#########################Weight Distribution Regularization##################
+            loss = cfg.CRITERION.kurt_rate * KurtosisLoss(self.model) #for reducing skewness
             loss.backward()
-            loss = cfg.CRITERION.skew_rate * SkewnessLoss(self.model)
+            loss = cfg.CRITERION.skew_rate * SkewnessLoss(self.model) #for reducing sharpness
             loss.backward()
-
-            self.model.module.set_biggest_subnet()
-            preds = self.model(inputs)
-            loss = self.criterion(preds, labels)
+##########################Group Progressive Guidance#########################
+            self.model.module.set_biggest_subnet() # Highest Quantization bit-width subnet
+            preds = self.model(inputs) 
+            loss = self.criterion(preds, labels) 
             loss.backward()
 
             with torch.no_grad():
                 soft_label = preds.clone().detach()
 
-            for arch_id in range(1, cfg.num_subnet):
+            for arch_id in range(1, cfg.num_subnet): # arch id: architecture ID
                 if arch_id == cfg.num_subnet - 1:
-                    self.model.module.set_smallest_subnet()
+                    self.model.module.set_smallest_subnet() # the lowest 
                 else:
                     self.model.module.set_random_subnet()
                 preds = self.model(inputs)
@@ -196,7 +197,7 @@ class QuantSuperNetTrainer(Trainer):
 
                 with torch.no_grad():
                     soft_label = preds.clone().detach()
-
+###################################################################################################3
             if cfg.OPTIM.use_grad_clip:
                 nn.utils.clip_grad_value_(self.model.parameters(), cfg.OPTIM.grad_clip_value)
             self.optimizer.step()
@@ -235,7 +236,7 @@ class QuantSuperNetTrainer(Trainer):
         return
 
 
-class AccPredictorTrainer(Trainer):
+class AccPredictorTrainer(Trainer): # training accuaracy predictor(CQAP)
     def __init__(self, model, criterion, test_criterion, optimizer, lr_scheduler, train_loader, test_loader):
         super(AccPredictorTrainer, self).__init__(model, criterion, optimizer, lr_scheduler, train_loader, test_loader)
         self.train_loss = meter.AverageMeter()
@@ -243,9 +244,9 @@ class AccPredictorTrainer(Trainer):
         self.test_criterion = test_criterion
         self.best_loss = 1000.0
 
-    def train_epoch(self, cur_epoch, rank):
+    def train_epoch(self, cur_epoch, rank): 
         self.train_loss.reset()
-        for batch_idx, (inputs, targets) in enumerate(self.train_loader):
+        for batch_idx, (inputs, targets) in enumerate(self.train_loader): # This is one-shot learning...maybe...?
             self.optimizer.zero_grad()
             inputs, targets = inputs.to(rank), targets.to(rank)
             outputs = self.model(inputs)

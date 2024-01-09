@@ -47,7 +47,7 @@ def main(local_rank, world_size):
 
     criterion = eval(cfg.CRITERION.criterion)
     soft_criterion = eval(cfg.CRITERION.soft_criterion)
-
+#
     _, train_set = imagenet_dali.get_imagenet_iter_torch('train', cfg.DATASET.data_path,
                                                          cfg.DATASET.train_batch_size,
                                                          num_threads=2, crop=224, device_id=cfg.GPUS[0])
@@ -73,17 +73,18 @@ def main(local_rank, world_size):
         'channel_wise_list': cfg.SEARCH_SPACE.channel_wise_list,
     }
     qnn = convert_to_QuantSuperModel(model, wq_params=wq_params, aq_params=aq_params, quantizer=cfg.quantizer,
-                                     search_space=search_space)
+                                     search_space=search_space) #"QATQuantSuperModel" class is stored in qnn
 
     if not cfg.disable_8bit_head_stem:
         print('Setting the first and the last layer to 8-bit')
         qnn.set_first_last_layer_to_8bit()
 
     cali_data = get_train_samples(train_loader=train_loader, num_samples=cfg.num_samples)
-    qnn.set_quant_state(True, True)
+    qnn.set_quant_state(True, True) #weight_quant = True, act_quant = True
     with torch.no_grad():
         _ = qnn(cali_data.cuda())
 
+#########################################choose optimizer#######################################################
     optimizer = optim.SGD(qnn.parameters(), lr=cfg.OPTIM.lr, momentum=cfg.OPTIM.momentum,
                           weight_decay=cfg.OPTIM.weight_decay)
     if cfg.OPTIM.optimizer == 'Adam':
@@ -91,19 +92,19 @@ def main(local_rank, world_size):
     elif cfg.OPTIM.optimizer == 'SGD':
         optimizer = optim.SGD(qnn.parameters(), lr=cfg.OPTIM.lr, momentum=cfg.OPTIM.momentum,
                               weight_decay=cfg.OPTIM.weight_decay)
-
+##############################################################################################################
     if cfg.Resume is not None:
         ckpt = torch.load(cfg.Resume, map_location='cuda')
         qnn.load_state_dict(ckpt['state_dict'])
         start_epoch = ckpt['epoch']
         optimizer.load_state_dict(ckpt['optimizer'])
 
-    qnn = DDP(qnn, device_ids=[local_rank], find_unused_parameters=True)
+    qnn = DDP(qnn, device_ids=[local_rank], find_unused_parameters=True) #DDP = Distributed Data Parallel
     trainer = QuantSuperNetTrainer(
         model=qnn,
         criterion=criterion,
         soft_criterion=soft_criterion,
-        teacher_model=model,
+        teacher_model=model, # teacher 
         optimizer=optimizer,
         lr_scheduler=None,
         train_loader=train_loader,
@@ -113,12 +114,12 @@ def main(local_rank, world_size):
 
     logger.info("Start supernet training.")
     dist.barrier()
-    trainer.start()
+    trainer.start() # start train 
     for cur_epoch in range(0, cfg.OPTIM.num_epochs):
         trainer.train_loader.sampler.set_epoch(cur_epoch)
 
-        trainer.train_epoch(cur_epoch, rank=local_rank, decay_value=None)
-        trainer.test_epoch(cur_epoch, rank=local_rank)
+        trainer.train_epoch(cur_epoch, rank=local_rank, decay_value=None) # training
+        trainer.test_epoch(cur_epoch, rank=local_rank)  # testing
     trainer.finish()
     dist.barrier()
     torch.cuda.empty_cache()

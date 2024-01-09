@@ -99,10 +99,11 @@ class KurtosisLossCalc:
         kurtosis_val = torch.mean((((self.weight_tensor - mean_output) / std_output) ** 4))
         self.kurtosis_loss = (kurtosis_val - self.kurtosis_target) ** 2
         self.kurtosis = kurtosis_val
-
+#########################k_mode is "avg" in general#######################################################
         if self.k_mode == 'avg':
             self.kurtosis_loss = torch.mean((kurtosis_val - self.kurtosis_target) ** 2)
             self.kurtosis = torch.mean(kurtosis_val)
+##########################################################################################################
         elif self.k_mode == 'max':
             self.kurtosis_loss = torch.max((kurtosis_val - self.kurtosis_target) ** 2)
             self.kurtosis = torch.max(kurtosis_val)
@@ -120,7 +121,7 @@ def KurtosisLoss(model):
             KurtosisList.append(w_kurt_inst.kurtosis_loss)
     del KurtosisList[0]
     # del KurtosisList[-1]
-    w_kurtosis_loss = reduce((lambda a, b: a + b), KurtosisList) / len(KurtosisList)
+    w_kurtosis_loss = reduce((lambda a, b: a + b), KurtosisList) / len(KurtosisList) #acculmate(sum) the value of kurtosis_loss. And device by len(KurotosisList)
     w_kurtosis_regularization = w_kurtosis_loss
     return w_kurtosis_regularization
 
@@ -143,10 +144,11 @@ class SkewnessLossCalc:
         skewness_val = torch.mean((((self.weight_tensor - mean_output) / std_output) ** 3))
         self.skewness_loss = (skewness_val - self.skewness_target) ** 2
         self.skewness = skewness_val
-
+#########################k_mode is "avg" in general#######################################################
         if self.k_mode == 'avg':
             self.skewness_loss = torch.mean((skewness_val - self.skewness_target) ** 2)
             self.skewness = torch.mean(skewness_val)
+########################################################################################################
         elif self.k_mode == 'max':
             self.skewness_loss = torch.max((skewness_val - self.skewness_target) ** 2)
             self.skewness = torch.max(skewness_val)

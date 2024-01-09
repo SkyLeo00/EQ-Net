@@ -9,6 +9,7 @@ import torchvision.models as models
 from core.builder import setup_env
 
 import core.config as config
+#below code is added to eval_imagenet(not added in eval_supernet)
 import runner.evaluator
 from runner.utils import Adaptive_BN, get_train_samples, convert_to_QuantSuperModel
 
@@ -18,6 +19,7 @@ from runner.evaluator import evaluation_quant_model_2to8, evaluation_model, eval
 import numpy as np
 import random
 from core.config import cfg, load_configs
+#eval_imagenet에만 포함됨. 
 from runner.utils import Adaptive_BN
 
 # Load config and check
@@ -83,13 +85,14 @@ def main():
 
     ckpt = torch.load(cfg.super_model, map_location='cuda')
     qnn.load_state_dict(ckpt['state_dict'])
-
+########################only in eval_imagenet. Not in eval_supernet#######
     model_state_dict = qnn.state_dict()
     state = {
         'state_dict': model_state_dict
     }
     torch.save(state, '/home/E21201018/code/MultiQuant+/ExpNew/imagenet/supermodel/resnet50_super.pt')
     print('saved!')
+#############################################################################
     search_space = {
         'w_bit_list': [2, 3, 4, 5, 6, 7, 8],
         'a_bit_list': [2, 3, 4, 5, 6, 7, 8],
